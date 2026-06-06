@@ -1,22 +1,25 @@
 # CreditCard-Default-Prediction-R
 Đồ án môn Lập trình R cho phân tích - Dự đoán rủi ro vỡ nợ thẻ tín dụng
+
+
+## 📂 Cấu trúc Thư mục & Hướng dẫn lưu trữ
+Để dự án gọn gàng và không bị ghi đè code của nhau, các thành viên vui lòng làm việc và lưu file **ĐÚNG** vào các thư mục tương ứng dưới đây:
+
+```text
 CreditCard-Default-Prediction-R/
 │
-├── 📁 data/                  # Thư mục chứa dữ liệu
-│   ├── raw/                  # Chứa file dữ liệu gốc ban đầu tải về
-│   └── processed/            # Chứa file dữ liệu sau khi đã làm sạch
+├── 📁 data/                  # NƠI CHỨA DỮ LIỆU (Chỉ lưu file .csv hoặc .xlsx)
+│   ├── raw/                  # (Thành viên 1) Lưu file dữ liệu gốc tải từ Kaggle vào đây. Tuyệt đối không chỉnh sửa file này.
+│   └── processed/            # (Thành viên 1) Lưu file dữ liệu sau khi đã code làm sạch vào đây. Các thành viên khác sẽ lấy file sạch từ thư mục này để chạy code.
 │
-├── 📁 scripts/               # Chứa các file code R riêng lẻ của từng người
-│   ├── 01_data_cleaning.R    # Code tiền xử lý (Thành viên 1)
-│   ├── 02_visualization.R    # Code vẽ biểu đồ (Thành viên 2)
-│   └── 03_modeling.R         # Code chạy thuật toán (Thành viên 3 & 4)
+├── 📁 scripts/               # NƠI CHỨA CODE R CỦA TỪNG NGƯỜI
+│   ├── 01_data_cleaning.R    # (Thành viên 1) Chỉ viết code tiền xử lý ở đây.
+│   ├── 02_visualization.R    # (Thành viên 2) Chỉ viết code vẽ biểu đồ ggplot2 ở đây.
+│   └── 03_modeling.R         # (Thành viên 3 & 4) Chỉ viết code train các thuật toán ở đây.
 │
-├── 📁 report/                # Chứa file chạy báo cáo chính
-│   └── Main_Report.Rmd       # File Rmarkdown gom code của cả 4 người
+├── 📁 report/                # NƠI CHỨA CODE BÁO CÁO TỔNG HỢP
+│   └── Main_Report.Rmd       # (Thành viên 4) Gom code từ thư mục scripts/ vào đây để chạy kết xuất ra báo cáo cuối cùng.
 │
-├── 📁 docs/                  # Thư mục nộp bài
-│   ├── Bao_cao_nhom.docx     # File Word 11 mục
-│   └── Slide_thuyet_trinh.pptx 
-│
-├── .gitignore                # (GitHub đã tự tạo ở Bước 1)
-└── README.md                 # Bộ mặt của Repo
+├── 📁 docs/                  # NƠI LƯU TRỮ TÀI LIỆU NỘP BÀI
+│   ├── Bao_cao_nhom.docx     # Cả nhóm cùng cập nhật nội dung báo cáo Word vào đây.
+│   └── Slide_thuyet_trinh.pptx # Chứa file slide thuyết trình chung.
