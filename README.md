@@ -1,8 +1,6 @@
 # 💳 Credit Card Default Prediction (Dự đoán rủi ro vỡ nợ thẻ tín dụng)
 
 ![R](https://img.shields.io/badge/R_Programming-%23276DC3.svg?style=for-the-badge&logo=r&logoColor=white)
-![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Classification-orange?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)
 
 Đây là đồ án kết thúc môn học **Lập trình R cho Phân tích**. Dự án ứng dụng các kỹ thuật Khai phá dữ liệu (Data Mining) và Học máy (Machine Learning) để xây dựng hệ thống cảnh báo sớm rủi ro tín dụng, hỗ trợ các tổ chức tài chính ra quyết định cấp hoặc thu hồi hạn mức thẻ tín dụng một cách tự động và tối ưu.
 
