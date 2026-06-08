@@ -81,9 +81,9 @@ Dự án được thực hiện qua các bước chính sau:
 
 Xem chi tiết đánh giá đóng góp của từng thành viên trong phần **"11. Peer Assessment"** của báo cáo Word chính.
 
-* **Tô Thuỷ Tiên:** Tiền xử lý và làm sạch dữ liệu.
-* **Lâm Ngọc Yến Vy:** Phân tích dữ liệu khám phá (EDA) và trực quan hóa.
-* **Trần Thị Quế Trân:** Xây dựng mô hình Hồi quy Logistic và Cây quyết định.
+* **Lâm Ngọc Yến Vy:** Tiền xử lý và làm sạch dữ liệu.
+* **Trần Thị Quế Trân:** Phân tích dữ liệu khám phá (EDA) và trực quan hóa.
+* **Tô Thuỷ Tiên:** Xây dựng mô hình Hồi quy Logistic và Cây quyết định.
 * **Phạm Thị Thảo Ngân:** Xây dựng mô hình Random Forest, tổng hợp file Rmarkdown và rà soát lỗi code.
 
 ## Cam kết Học thuật
