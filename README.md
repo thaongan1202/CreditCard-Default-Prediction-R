@@ -1,92 +1,235 @@
-# 💳 # Phân tích và Dự đoán Rủi ro Vỡ nợ Thẻ tín dụng (Credit Card Default Prediction)
+# 🏦 Dự đoán Khả năng Vỡ nợ Thẻ Tín dụng
+### Credit Card Default Prediction — Đồ án Kết thúc môn Lập trình R cho Phân tích Dữ liệu
 
-![R](https://img.shields.io/badge/R_Programming-%23276DC3.svg?style=for-the-badge&logo=r&logoColor=white)
+![R](https://img.shields.io/badge/Language-R%204.x-276DC3?style=flat&logo=r)
+![Dataset](https://img.shields.io/badge/Dataset-UCI%20Credit%20Card-orange)
+![Observations](https://img.shields.io/badge/Observations-30%2C000-green)
+![Models](https://img.shields.io/badge/Models-3%20Classification-blue)
+![Status](https://img.shields.io/badge/Status-Completed-brightgreen)
 
-Đây là đồ án kết thúc môn học "Lập trình R cho Phân tích", thực hiện phân tích dữ liệu khách hàng sử dụng thẻ tín dụng nhằm hiểu rõ các đặc điểm thanh toán và xác định rủi ro vỡ nợ.
+---
 
-## Giới thiệu Dự án
+## 📋 Mục lục
 
-Trong hoạt động của ngân hàng, việc kiểm soát nợ xấu từ thẻ tín dụng là một trong những ưu tiên hàng đầu. Dự án này sử dụng ngôn ngữ R và các kỹ thuật phân tích dữ liệu để:
+- [Tổng quan dự án](#tổng-quan-dự-án)
+- [Câu hỏi nghiên cứu](#câu-hỏi-nghiên-cứu)
+- [Tập dữ liệu](#tập-dữ-liệu)
+- [Phương pháp](#phương-pháp)
+- [Kết quả nổi bật](#kết-quả-nổi-bật)
+- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Hướng dẫn chạy](#hướng-dẫn-chạy)
+- [Thành viên nhóm](#thành-viên-nhóm)
+- [Tham khảo](#tham-khảo)
 
-- Mô tả và khám phá đặc điểm nhân khẩu học, thói quen chi tiêu của khách hàng.
-- Tìm hiểu các yếu tố ảnh hưởng lớn nhất đến việc khách hàng trễ hạn thanh toán.
-- Xây dựng mô hình phân loại (Classification) để dự đoán khả năng vỡ nợ của khách hàng trong tháng tiếp theo.
+---
 
-## Thành viên Nhóm
+## 🎯 Tổng quan dự án
 
-- Tô Thuỷ Tiên
-- Lâm Ngọc Yến Vy
-- Trần Thị Quế Trân
-- Phạm Thị Thảo Ngân
+Trong lĩnh vực tài chính ngân hàng, khả năng dự đoán sớm nguy cơ vỡ nợ của khách hàng thẻ tín dụng mang ý nghĩa chiến lược quan trọng: giúp tổ chức tín dụng chủ động quản lý rủi ro, tối ưu hóa danh mục cho vay và giảm thiểu tổn thất tài chính.
 
-## Bộ dữ liệu
+Dự án này sử dụng ngôn ngữ **R** để phân tích toàn diện bộ dữ liệu khách hàng thẻ tín dụng tại Đài Loan, bao gồm:
 
-Dữ liệu được sử dụng là bộ "Default of Credit Card Clients" từ nền tảng Kaggle, chứa thông tin về nhân khẩu học, lịch sử thanh toán, hóa đơn và hạn mức tín dụng của 30.000 khách hàng tại Đài Loan.
+- Tiền xử lý dữ liệu và xây dựng đặc trưng có ý nghĩa tài chính
+- Phân tích dữ liệu khám phá (EDA) để phát hiện các yếu tố rủi ro
+- Xây dựng và so sánh ba mô hình phân loại: **Hồi quy Logistic**, **Cây quyết định** và **Random Forest**
+- Đề xuất chiến lược cảnh báo sớm cho ngân hàng dựa trên kết quả phân tích
 
-- **Nguồn:** [https://www.kaggle.com/datasets/uciml/default-of-credit-card-clients-dataset](https://www.kaggle.com/datasets/uciml/default-of-credit-card-clients-dataset)
-- **File chính:** `default_of_credit_card_clients.csv` (đặt trong thư mục `data/`)
+---
 
-## Cấu trúc Thư mục Dự án
+## ❓ Câu hỏi nghiên cứu
 
-```text
-CreditCard-Default-Prediction/
-├── data/       # Chứa file dữ liệu default_of_credit_card_clients.csv
-├── ref/        # Thư mục tham khảo, chứa tài liệu, rubric hướng dẫn
-├── scripts/    # Chứa mã nguồn R lẻ của từng thành viên
-├── report/     # Chứa file báo cáo cuối cùng (.Rmd, .docx, .pptx)
-└── README.md   
+Dự án tập trung giải quyết ba câu hỏi chính:
+
+1. **Yếu tố rủi ro nào có liên quan mạnh nhất đến khả năng vỡ nợ?**  
+   → Trả lời qua EDA và hệ số Odds Ratio từ Hồi quy Logistic.
+
+2. **Mô hình phân loại nào cho hiệu suất dự đoán tốt nhất trên tập dữ liệu này?**  
+   → Trả lời qua so sánh AUC-ROC, Sensitivity và F1-score của ba mô hình.
+
+3. **Biến đầu vào nào quan trọng nhất đối với quyết định phân loại?**  
+   → Trả lời qua Feature Importance của Random Forest.
+
+---
+
+## 📊 Tập dữ liệu
+
+| Thuộc tính | Thông tin |
+|---|---|
+| **Tên** | Default of Credit Card Clients Dataset |
+| **Nguồn** | [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients) |
+| **Tác giả gốc** | I-Cheng Yeh (2009) |
+| **Số quan sát** | 30.000 khách hàng |
+| **Số biến** | 25 (24 biến độc lập + 1 biến mục tiêu) |
+| **Biến mục tiêu** | `default.payment.next.month` (0 = Không vỡ nợ, 1 = Vỡ nợ) |
+| **Tỷ lệ vỡ nợ** | 22.12% (mất cân bằng lớp cần xử lý) |
+| **Giai đoạn** | Tháng 4–9 năm 2005 |
+
+### Nhóm biến chính
+
+| Nhóm | Biến | Mô tả |
+|---|---|---|
+| Nhân khẩu học | SEX, EDUCATION, MARRIAGE, AGE | Giới tính, học vấn, hôn nhân, tuổi |
+| Tài chính | LIMIT_BAL | Hạn mức tín dụng (NT$) |
+| Lịch sử thanh toán | PAY_0 → PAY_6 | Tình trạng thanh toán tháng 9→4/2005 |
+| Dư nợ sao kê | BILL_AMT1 → BILL_AMT6 | Số dư tháng 9→4/2005 (NT$) |
+| Số tiền đã trả | PAY_AMT1 → PAY_AMT6 | Thanh toán tháng 9→4/2005 (NT$) |
+
+> Xem mô tả chi tiết tại [`data/data_dictionary.md`](data/data_dictionary.md)
+
+---
+
+## 🔬 Phương pháp
+
+### Pipeline phân tích
+
 ```
-## Quy trình Phân tích
+UCI_Credit_Card.csv
+        ↓
+  Tiền xử lý dữ liệu
+  (Xử lý giá trị bất thường trong biến phân loại,
+   chuyển đổi kiểu dữ liệu, loại bỏ ID)
+        ↓
+  Feature Engineering
+  (MAX_DELAY, UTILIZATION_RATE, AVG_PAY_AMT, REPAY_RATIO)
+        ↓
+  Phân tích dữ liệu khám phá (EDA)
+  (Đơn biến, đa biến, ma trận tương quan)
+        ↓
+  Chia dữ liệu Train/Test (75%/25%, Stratified)
+  + Xử lý mất cân bằng lớp (ROSE)
+        ↓
+  Xây dựng 3 mô hình phân loại
+        ↓
+  Đánh giá & So sánh (AUC, Sensitivity, F1)
+        ↓
+  Kết luận & Đề xuất
+```
 
-Dự án được thực hiện qua các bước chính sau:
+### Ba mô hình phân loại
 
-1. **Tiền xử lý dữ liệu:**
-    * Làm sạch dữ liệu (xử lý giá trị thiếu, loại bỏ hoặc chuẩn hóa dữ liệu ngoại lai).
-    * Xử lý các giá trị không hợp lệ trong biến phân loại (Học vấn, Tình trạng hôn nhân).
-2. **Phân tích dữ liệu khám phá (EDA):**
-    * Trực quan hóa bằng histogram, boxplot, bar chart, v.v.
-    * Phân tích mối quan hệ giữa độ tuổi, hạn mức, lịch sử thanh toán với khả năng vỡ nợ.
-3. **Mô hình hóa dữ liệu:**
-    * **Hồi quy Logistic (Logistic Regression):** Đánh giá mối liên hệ tuyến tính và dự đoán xác suất vỡ nợ.
-    * **Cây quyết định (Decision Tree):** Trực quan hóa các quy luật ra quyết định phân loại khách hàng.
-    * **Rừng ngẫu nhiên (Random Forest):** Cải thiện độ chính xác và đánh giá tầm quan trọng của các biến.
-4. **Đánh giá mô hình và Diễn giải kết quả:**
-    * Đánh giá độ chính xác của các mô hình qua Accuracy, Precision, Recall và Confusion Matrix.
-    * Phân tích ý nghĩa của các yếu tố ảnh hưởng đến quyết định vỡ nợ.
-5. **Kết luận và Đề xuất:**
-    * Tóm tắt phát hiện chính từ dữ liệu.
-    * Đề xuất các ứng dụng để kiểm soát hạn mức thẻ tín dụng.
+| Mô hình | Thư viện R | Vai trò trong dự án |
+|---|---|---|
+| Hồi quy Logistic | `stats::glm()` | Baseline — có thể diễn giải Odds Ratio |
+| Cây quyết định | `rpart` | Trực quan — giải thích được cho người không chuyên |
+| Random Forest | `randomForest` | Hiệu suất cao — cung cấp Feature Importance |
 
-## Công cụ và Thư viện R chính
+### Chỉ số đánh giá
 
-* **Ngôn ngữ:** R
-* **IDE:** RStudio
-* **Các gói R sử dụng:**
-    * `dplyr`, `tidyr`: Xử lý và thao tác dữ liệu
-    * `ggplot2`, `corrplot`: Trực quan hóa dữ liệu
-    * `rpart`, `rpart.plot`: Phân tích và vẽ Cây quyết định
-    * `randomForest`: Phân tích Rừng ngẫu nhiên
-    * `caret`: Hỗ trợ đánh giá mô hình phân loại
-    * `knitr`, `rmarkdown`: Tạo báo cáo
+Vì bài toán vỡ nợ là **asymmetric** (bỏ sót người vỡ nợ tốn kém hơn cảnh báo nhầm), dự án ưu tiên:
 
-## Cách chạy Báo cáo
+- **Sensitivity (Recall)** — Khả năng phát hiện đúng người thực sự vỡ nợ
+- **AUC-ROC** — Khả năng phân biệt tổng thể giữa hai lớp
+- **F1-score** — Cân bằng giữa Precision và Recall
 
-1. Clone repository này về máy tính.
-2. Mở file `.Rproj` hoặc file `Main_Report.Rmd` trong thư mục `report/` bằng RStudio.
-3. Đảm bảo đã cài đặt các thư viện R cần thiết.
-4. Đặt file dữ liệu `default_of_credit_card_clients.csv` vào thư mục `data/`.
-5. Nhấn Knit để tạo báo cáo (Word hoặc PDF/HTML).
+Accuracy **không** được dùng làm chỉ số chính vì dữ liệu mất cân bằng (78:22).
 
-## Đóng góp
+---
 
-Xem chi tiết đánh giá đóng góp của từng thành viên trong phần **"11. Peer Assessment"** của báo cáo Word chính.
+## 📈 Kết quả nổi bật
 
-* **Lâm Ngọc Yến Vy:** Tiền xử lý và làm sạch dữ liệu.
-* **Trần Thị Quế Trân:** Phân tích dữ liệu khám phá (EDA) và trực quan hóa.
-* **Tô Thuỷ Tiên:** Xây dựng mô hình Hồi quy Logistic và Cây quyết định.
-* **Phạm Thị Thảo Ngân:** Xây dựng mô hình Random Forest, tổng hợp file Rmarkdown và rà soát lỗi code.
+> ⚠️ *Bảng dưới đây sẽ được cập nhật sau khi hoàn thành phân tích*
 
-## Cam kết Học thuật
+| Mô hình | Accuracy | Sensitivity | AUC | F1-score |
+|---|---|---|---|---|
+| Hồi quy Logistic | — | — | — | — |
+| Cây quyết định | — | — | — | — |
+| **Random Forest** | — | — | — | — |
 
-Dự án này là sản phẩm thực hành dựa trên kiến thức môn học. Toàn bộ mã nguồn, dữ liệu và tài liệu tham khảo đều được trích dẫn đầy đủ tại mục Phụ lục của báo cáo.
+### Phát hiện chính từ EDA
 
+- **Lịch sử thanh toán là yếu tố rủi ro mạnh nhất:**  
+  Khi `PAY_0 = 2` (trễ 2 tháng), tỷ lệ vỡ nợ lên tới **69.1%**. Khi `PAY_0 = 3`, lên tới **75.8%**.
+
+- **Hạn mức tín dụng thấp đi kèm rủi ro cao hơn:**  
+  Nhóm hạn mức thấp nhất (Q1) có tỷ lệ vỡ nợ **31.8%**, cao hơn gấp đôi nhóm hạn mức cao nhất (Q4: 14.0%).
+
+- **Đa cộng tuyến trong nhóm BILL_AMT:**  
+  Sáu biến `BILL_AMT1–6` có hệ số tương quan lẫn nhau > 0.80 (cao nhất: r = 0.95 giữa BILL_AMT1 và BILL_AMT2), được xử lý bằng cách tổng hợp thành biến `UTILIZATION_RATE`.
+
+---
+
+## 📁 Cấu trúc dự án
+
+```
+credit-card-default-prediction/
+│
+├── README.md                      ← Tài liệu tổng quan (file này)
+├── Main_Report.Rmd                ← File Rmarkdown chính — chạy để reproduce
+├── Main_Report.html               ← Báo cáo đã render (xem trực tiếp)
+│
+├── data/
+│   ├── UCI_Credit_Card.csv        ← Dataset gốc (30.000 × 25)
+│   └── data_dictionary.md        ← Mô tả chi tiết 25 biến
+│
+├── output/
+│   └── figures/                   ← Biểu đồ đã export (nếu có)
+│
+└── docs/
+    ├── Bao_Cao_Word.docx          ← Báo cáo Word (nộp giáo viên)
+    └── Slide_Thuyet_Trinh.pptx   ← Slide thuyết trình
+```
+
+---
+
+## 🚀 Hướng dẫn chạy
+
+### Yêu cầu
+
+- **R** phiên bản 4.0 trở lên  
+- **RStudio** (khuyến nghị) hoặc bất kỳ IDE nào hỗ trợ R Markdown
+
+### Các bước thực hiện
+
+**Bước 1 — Clone repository:**
+```bash
+git clone https://github.com/[username]/credit-card-default-prediction.git
+cd credit-card-default-prediction
+```
+
+**Bước 2 — Cài đặt thư viện:** Mở R/RStudio và chạy lệnh sau (chỉ cần làm một lần):
+```r
+install.packages("pacman")
+pacman::p_load(dplyr, tidyr, ggplot2, patchwork, corrplot,
+               caret, pROC, rpart, rpart.plot, randomForest,
+               ROSE, car, knitr, kableExtra)
+```
+
+**Bước 3 — Render báo cáo:** Mở `Main_Report.Rmd` trong RStudio và nhấn **Knit**, hoặc chạy trong Console:
+```r
+rmarkdown::render("Main_Report.Rmd", output_format = "html_document")
+```
+
+**Lưu ý:** Bước Random Forest có thể mất 2–5 phút tùy cấu hình máy. Toàn bộ pipeline được thiết kế để chạy từ đầu đến cuối **không cần thao tác thủ công**.
+
+---
+
+## 👥 Thành viên nhóm
+
+| STT | Thành viên | MSSV | Nhiệm vụ chính |
+|---|---|---|---|
+| 1 | Lâm Ngọc Yến Vy | [MSSV] | Tiền xử lý dữ liệu, Feature Engineering |
+| 2 | Trần Thị Quế Trân | [MSSV] | EDA, Trực quan hóa dữ liệu |
+| 3 | Tô Thuỷ Tiên | [MSSV] | Mô hình Logistic Regression, Decision Tree |
+| 4 | Phạm Thị Thảo Ngân | [MSSV] | Random Forest, Tích hợp & QA, README |
+
+---
+
+## 📚 Tham khảo
+
+- **Dataset gốc:**  
+  Yeh, I. C., & Lien, C. H. (2009). The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. *Expert Systems with Applications*, 36(2), 2473–2480.
+
+- **Tài liệu R:**  
+  Wickham, H., & Grolemund, G. (2017). *R for Data Science*. O'Reilly Media.  
+  [https://r4ds.had.co.nz](https://r4ds.had.co.nz)
+
+- **Tài liệu môn học:**  
+  Tài liệu hướng dẫn môn Lập trình R cho Phân tích Dữ liệu — HCMUTE
+
+---
+
+<div align="center">
+
+*Đồ án môn học | Lập trình R cho Phân tích Dữ liệu | HCMUTE*
+
+</div>

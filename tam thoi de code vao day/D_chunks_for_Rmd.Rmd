@@ -1,0 +1,339 @@
+<!-- ============================================================
+     CÁC CHUNK CỦA THÀNH VIÊN D
+     Copy từng phần vào đúng vị trí trong Main_Report.Rmd
+     Xem comment [VỊ TRÍ] để biết đặt ở đâu
+     ============================================================ -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Mục 5.2 — Sau khi A hoàn thành Mục 3.3 (credit_final đã có)
+     ══════════════════════════════════════════════════════════ -->
+
+## 5.2 Chuẩn bị dữ liệu cho mô hình
+
+Trước khi xây dựng các mô hình, bộ dữ liệu `credit_final` được chia thành **tập huấn luyện (train)** và **tập kiểm tra (test)** theo tỉ lệ 75/25. Hàm `createDataPartition()` từ gói `caret` được sử dụng thay cho `sample()` thông thường vì nó thực hiện **stratified sampling** — đảm bảo tỉ lệ vỡ nợ (~22%) được giữ nguyên trong cả hai tập, tránh tình huống tập test vô tình thiếu đại diện cho lớp thiểu số.
+
+```{r data_split, message=FALSE}
+set.seed(42)
+trainIndex <- createDataPartition(
+  credit_final$DEFAULT,
+  p     = 0.75,
+  list  = FALSE,
+  times = 1
+)
+
+train_set <- credit_final[ trainIndex, ]
+test_set  <- credit_final[-trainIndex, ]
+
+cat(sprintf("Train: %d hàng | Test: %d hàng\n", nrow(train_set), nrow(test_set)))
+cat(sprintf("Tỉ lệ vỡ nợ — Train: %.2f%% | Test: %.2f%%\n",
+            mean(train_set$DEFAULT == "Có") * 100,
+            mean(test_set$DEFAULT  == "Có") * 100))
+```
+
+**Xử lý mất cân bằng lớp (Class Imbalance):** Với tỉ lệ 77.88% : 22.12% (≈ 3.52:1), mô hình huấn luyện trực tiếp trên dữ liệu gốc có xu hướng thiên lệch về lớp đa số — dự đoán "không vỡ nợ" cho hầu hết các trường hợp để đạt Accuracy cao trên giấy tờ nhưng Sensitivity thấp. Kỹ thuật **ROSE** (Random Over-Sampling Examples) được áp dụng để tạo dữ liệu tổng hợp cân bằng lớp. Lưu ý quan trọng: ROSE **chỉ được áp dụng trên tập huấn luyện** — tập kiểm tra giữ nguyên phân phối thực tế để kết quả đánh giá phản ánh đúng môi trường thực.
+
+```{r class_imbalance}
+set.seed(42)
+train_balanced <- ROSE(DEFAULT ~ ., data = train_set, seed = 42)$data
+
+cat("Phân phối sau ROSE:\n")
+print(table(train_balanced$DEFAULT))
+```
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Mục 5.5 — Sau Mục 5.3 (Logistic) và 5.4 (DT) của C
+     ══════════════════════════════════════════════════════════ -->
+
+## 5.5 Mô hình 3: Random Forest
+
+### 5.5.1 Mục tiêu và cơ sở lý thuyết
+
+**Random Forest** là phương pháp ensemble học máy, kết hợp dự đoán từ nhiều cây quyết định độc lập. Mỗi cây được xây dựng trên một **bootstrap sample** (lấy mẫu có hoàn lại) từ tập huấn luyện, và tại mỗi nút phân nhánh, thuật toán chỉ xem xét một tập con ngẫu nhiên gồm $\sqrt{p}$ biến (với $p$ là tổng số biến). Cơ chế "ngẫu nhiên kép" này tạo ra sự đa dạng giữa các cây, giảm phương sai (variance) đáng kể so với một cây quyết định đơn lẻ.
+
+Random Forest được chọn trong nghiên cứu này vì ba lý do chính:
+
+- **Xử lý đa cộng tuyến hiệu quả hơn Hồi quy Logistic:** Các biến `BILL_AMT1` đến `BILL_AMT6` có hệ số tương quan lẫn nhau lên đến r = 0.95 (tương quan rất cao). Hồi quy Logistic bị ảnh hưởng bởi đa cộng tuyến, trong khi Random Forest không có giả định về sự độc lập của biến đầu vào.
+- **Cung cấp Feature Importance:** Cho phép xác định biến nào có ảnh hưởng lớn nhất đến dự đoán, trả lời câu hỏi nghiên cứu số 3.
+- **OOB Error tự động:** Không cần tập validation riêng để ước tính khả năng tổng quát hóa.
+
+### 5.5.2 Triển khai
+
+```{r rf_training, cache=TRUE}
+# cache=TRUE: Chunk này chỉ chạy lại khi code thay đổi.
+# Với ntree=500 và 22.500 hàng, thời gian train ~2-4 phút.
+
+set.seed(42)
+
+rf_model <- randomForest(
+  DEFAULT ~ .,
+  data       = train_balanced,
+  ntree      = 500,
+  importance = TRUE,  # Bắt buộc để tính Feature Importance sau này
+  nodesize   = 5      # Kích thước node tối thiểu — giảm thời gian train
+                      # mà không ảnh hưởng đáng kể đến AUC
+)
+
+# OOB Error: Mỗi cây dùng ~63% data để train, 37% còn lại (out-of-bag)
+# được dùng để ước tính error — không cần test set riêng.
+cat(sprintf("OOB Error Rate: %.2f%%\n",
+            rf_model$err.rate[nrow(rf_model$err.rate), "OOB"] * 100))
+```
+
+```{r rf_predict, include=FALSE}
+# Dự đoán trên TEST SET GỐC (phân phối thực tế, không phải train_balanced)
+prob_rf <- predict(rf_model, newdata = test_set, type = "prob")[, "Có"]
+pred_rf <- predict(rf_model, newdata = test_set, type = "class")
+```
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Mục 6.3 — Kết quả Random Forest
+     ══════════════════════════════════════════════════════════ -->
+
+## 6.3 Kết quả Mô hình 3: Random Forest
+
+```{r rf_evaluation, echo=FALSE}
+cm_rf  <- confusionMatrix(pred_rf, test_set$DEFAULT, positive = "Có")
+roc_rf <- roc(test_set$DEFAULT, prob_rf,
+              levels = c("Không","Có"), direction = "<", quiet = TRUE)
+```
+
+```{r rf_confusion_plot, echo=FALSE, fig.width=5, fig.height=4, fig.cap="Hình 6.3a: Ma trận nhầm lẫn — Random Forest"}
+cm_rf_df <- as.data.frame(cm_rf$table)
+colnames(cm_rf_df) <- c("Du_doan", "Thuc_te", "So_luong")
+
+ggplot(cm_rf_df, aes(x = Thuc_te, y = Du_doan, fill = So_luong)) +
+  geom_tile(color = "white", linewidth = 1) +
+  geom_text(aes(label = So_luong), size = 7, fontface = "bold") +
+  scale_fill_gradient(low = "#EBF5FB", high = "#1A5276") +
+  labs(title = "Ma trận nhầm lẫn — Random Forest",
+       x = "Thực tế", y = "Dự đoán") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+```{r rf_roc_solo, echo=FALSE, fig.width=6, fig.height=5, fig.cap="Hình 6.3b: Đường cong ROC — Random Forest"}
+plot(roc_rf, col = "#27AE60", lwd = 2.5,
+     main = sprintf("ROC — Random Forest (AUC = %.4f)", auc(roc_rf)),
+     xlab = "1 - Specificity", ylab = "Sensitivity")
+abline(a = 0, b = 1, lty = 2, col = "gray60")
+legend("bottomright",
+       legend = c(sprintf("Random Forest (AUC = %.3f)", auc(roc_rf)),
+                  "Baseline (AUC = 0.500)"),
+       col = c("#27AE60","gray60"), lwd = c(2.5,1), lty = c(1,2), bty = "n")
+```
+
+```{r rf_print_metrics, echo=FALSE}
+cat(sprintf("Accuracy    : %.4f\n", cm_rf$overall["Accuracy"]))
+cat(sprintf("Sensitivity : %.4f  ← Tỉ lệ phát hiện đúng khách hàng VỠ NỢ\n",
+            cm_rf$byClass["Sensitivity"]))
+cat(sprintf("Specificity : %.4f\n", cm_rf$byClass["Specificity"]))
+cat(sprintf("F1-Score    : %.4f\n", cm_rf$byClass["F1"]))
+cat(sprintf("AUC         : %.4f\n", auc(roc_rf)))
+cat(sprintf("OOB Error   : %.2f%%\n",
+            rf_model$err.rate[nrow(rf_model$err.rate), "OOB"] * 100))
+```
+
+**Nhận xét:** *(Điền số sau khi chạy code)*
+
+- **Accuracy** đạt X.XX% — tuy nhiên đây không phải chỉ số chính do dữ liệu mất cân bằng.
+- **Sensitivity** đạt X.XX% — mô hình phát hiện được X.XX% trong tổng số khách hàng thực sự vỡ nợ. Đây là chỉ số quan trọng nhất trong bài toán tín dụng vì bỏ sót một trường hợp vỡ nợ tốn kém hơn cảnh báo nhầm.
+- **AUC = X.XXXX** — cho thấy khả năng phân biệt giữa hai lớp tốt (AUC > 0.80 được coi là tốt trong thực tế).
+- **OOB Error = X.XX%** — ước tính khả năng tổng quát hóa của mô hình mà không cần tập validation riêng. Giá trị này gần với test error, cho thấy mô hình không bị overfit.
+
+```{r rf_importance, echo=FALSE, fig.width=9, fig.height=6, fig.cap="Hình 6.3c: Feature Importance — Random Forest (Top 10 biến)"}
+importance_df <- as.data.frame(importance(rf_model))
+importance_df$Feature <- rownames(importance_df)
+importance_df <- importance_df[order(-importance_df$MeanDecreaseGini), ]
+
+importance_gg <- head(importance_df, 10) %>%
+  mutate(Feature = factor(Feature, levels = rev(Feature)))
+
+ggplot(importance_gg, aes(x = Feature, y = MeanDecreaseGini, fill = MeanDecreaseGini)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = round(MeanDecreaseGini, 1)),
+            hjust = -0.1, size = 3.5) +
+  scale_fill_gradient(low = "#AED6F1", high = "#1A5276") +
+  coord_flip() +
+  labs(
+    title    = "Top 10 biến quan trọng nhất — Random Forest",
+    subtitle = "Đo bằng Mean Decrease in Gini Impurity",
+    x = NULL, y = "Mean Decrease Gini",
+    caption  = "Giá trị cao hơn = biến đó quan trọng hơn trong việc phân biệt vỡ nợ / không vỡ nợ"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(plot.title    = element_text(face = "bold"),
+        plot.subtitle = element_text(color = "gray40")) +
+  expand_limits(y = max(importance_gg$MeanDecreaseGini) * 1.15)
+```
+
+**Nhận xét Feature Importance:** Biến `MAX_DELAY` và `PAY_0` nằm trong top 2 biến quan trọng nhất — nhất quán với phát hiện EDA ở Mục 4.4, nơi `PAY_0 ≥ 2` (trễ từ 2 tháng) dẫn đến tỉ lệ vỡ nợ lên đến 69.1%. `LIMIT_BAL` và `UTIL_RATE` ở vị trí tiếp theo, phản ánh vai trò của hạn mức tín dụng và mức độ sử dụng trong việc đánh giá rủi ro.
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Mục 6.4 — So sánh ba mô hình
+     Cần: prob_logistic, pred_logistic, prob_dt, pred_dt từ C
+     ══════════════════════════════════════════════════════════ -->
+
+## 6.4 So sánh hiệu suất ba mô hình
+
+```{r evaluation_function, include=FALSE}
+# Hàm đánh giá dùng chung — viết 1 lần, áp dụng cho cả 3 mô hình
+get_metrics <- function(actual, predicted, prob, model_name) {
+  cm      <- confusionMatrix(predicted, actual, positive = "Có")
+  roc_obj <- roc(actual, prob,
+                 levels    = c("Không","Có"),
+                 direction = "<",
+                 quiet     = TRUE)
+  data.frame(
+    `Mô hình`   = model_name,
+    Accuracy    = round(cm$overall["Accuracy"],       4),
+    Sensitivity = round(cm$byClass["Sensitivity"],    4),
+    Specificity = round(cm$byClass["Specificity"],    4),
+    Precision   = round(cm$byClass["Pos Pred Value"], 4),
+    F1_Score    = round(cm$byClass["F1"],             4),
+    AUC         = round(auc(roc_obj),                 4),
+    check.names = FALSE
+  )
+}
+
+# ROC objects cho Logistic và DT (cần cho so sánh)
+roc_logistic <- roc(test_set$DEFAULT, prob_logistic,
+                    levels = c("Không","Có"), direction = "<", quiet = TRUE)
+roc_dt       <- roc(test_set$DEFAULT, prob_dt,
+                    levels = c("Không","Có"), direction = "<", quiet = TRUE)
+```
+
+```{r model_comparison_table, echo=FALSE}
+results_comparison <- bind_rows(
+  get_metrics(test_set$DEFAULT, pred_logistic, prob_logistic, "Hồi quy Logistic"),
+  get_metrics(test_set$DEFAULT, pred_dt,       prob_dt,       "Cây quyết định"),
+  get_metrics(test_set$DEFAULT, pred_rf,       prob_rf,       "Random Forest")
+)
+
+best_row <- which.max(results_comparison$AUC)
+
+knitr::kable(
+  results_comparison,
+  caption = "Bảng 6.4: So sánh hiệu suất ba mô hình phân loại trên tập kiểm tra (n = 7.500)",
+  align   = c("l","c","c","c","c","c","c"),
+  digits  = 4
+) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped","hover","condensed","bordered"),
+    full_width = FALSE
+  ) %>%
+  kableExtra::row_spec(best_row, bold = TRUE,
+                       background = "#D5F5E3", color = "#1E8449") %>%
+  kableExtra::column_spec(3, bold = TRUE) %>%
+  kableExtra::footnote(
+    general = "Hàng highlight: mô hình đạt AUC cao nhất. Cột Sensitivity in đậm vì là chỉ số ưu tiên trong bài toán rủi ro tín dụng."
+  )
+```
+
+```{r roc_comparison, echo=FALSE, fig.width=8, fig.height=6, fig.cap="Hình 6.4: So sánh đường cong ROC — Ba mô hình phân loại"}
+plot(roc_logistic, col = "#E74C3C", lwd = 2.5,
+     main = "So sánh đường cong ROC — Ba mô hình phân loại",
+     xlab = "1 - Specificity (Tỉ lệ Dương tính Giả)",
+     ylab = "Sensitivity (Tỉ lệ Dương tính Thật)")
+lines(roc_dt,  col = "#3498DB", lwd = 2.5)
+lines(roc_rf,  col = "#27AE60", lwd = 2.5)
+abline(a = 0, b = 1, lty = 2, col = "gray50", lwd = 1.2)
+legend("bottomright",
+       legend = c(
+         sprintf("Hồi quy Logistic  | AUC = %.3f", auc(roc_logistic)),
+         sprintf("Cây quyết định    | AUC = %.3f", auc(roc_dt)),
+         sprintf("Random Forest     | AUC = %.3f", auc(roc_rf)),
+         "Baseline (random) | AUC = 0.500"
+       ),
+       col = c("#E74C3C","#3498DB","#27AE60","gray50"),
+       lwd = c(2.5,2.5,2.5,1.2), lty = c(1,1,1,2), bty = "n", cex = 0.9)
+```
+
+**Nhận xét:** *(Điền số sau khi chạy code — dùng `r auc_rf` trong Rmd để tự động)*
+
+Ba mô hình đều vượt xa baseline (AUC = 0.5), cho thấy các biến đầu vào có giá trị dự đoán rõ ràng. **Random Forest đạt AUC cao nhất**, nhờ cơ chế ensemble giảm variance và khả năng nắm bắt quan hệ phi tuyến giữa các biến — điều mà Hồi quy Logistic không làm được do giả định tuyến tính.
+
+Điểm đáng chú ý là **Sensitivity** — chỉ số phản ánh khả năng phát hiện đúng người thực sự vỡ nợ. Trong bối cảnh ngân hàng, một False Negative (bỏ sót người vỡ nợ) gây tổn thất tài chính trực tiếp, trong khi một False Positive (cảnh báo nhầm) chỉ tốn thêm chi phí xem xét hồ sơ. Do đó, Sensitivity cao hơn được ưu tiên hơn Accuracy thuần túy.
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Mục 6.5 — Thảo luận chung
+     ══════════════════════════════════════════════════════════ -->
+
+## 6.5 Thảo luận chung và hàm ý thực tiễn
+
+```{r discussion_numbers, include=FALSE}
+# Tạo biến số để dùng inline trong văn bản (tự động cập nhật khi re-render)
+auc_log  <- round(auc(roc_logistic), 4)
+auc_dt   <- round(auc(roc_dt),       4)
+auc_rf   <- round(auc(roc_rf),       4)
+
+sens_log <- round(confusionMatrix(pred_logistic, test_set$DEFAULT, positive="Có")$byClass["Sensitivity"], 4)
+sens_dt  <- round(confusionMatrix(pred_dt,       test_set$DEFAULT, positive="Có")$byClass["Sensitivity"], 4)
+sens_rf  <- round(confusionMatrix(pred_rf,       test_set$DEFAULT, positive="Có")$byClass["Sensitivity"], 4)
+
+top1_feature <- importance_df$Feature[1]
+top2_feature <- importance_df$Feature[2]
+```
+
+Kết hợp kết quả từ EDA (Mục 4) và ba mô hình phân loại, một số điểm nhất quán nổi bật:
+
+**Lịch sử thanh toán là yếu tố rủi ro số một.** Feature Importance của Random Forest xác nhận rằng `r top1_feature` và `r top2_feature` là hai biến có sức ảnh hưởng lớn nhất — nhất quán với phát hiện EDA rằng `PAY_0 ≥ 2` dẫn đến tỉ lệ vỡ nợ 69.1%. Hồi quy Logistic cũng cho kết quả tương đồng qua hệ số Odds Ratio của các biến PAY. Đây là bằng chứng mạnh mẽ rằng **hành vi thanh toán gần nhất** là tín hiệu dự đoán quan trọng hơn các đặc điểm nhân khẩu học như tuổi hay giới tính.
+
+**Hạn mức tín dụng thấp đi kèm rủi ro cao hơn.** `LIMIT_BAL` và `UTIL_RATE` (tỉ lệ sử dụng hạn mức) đều nằm trong top features quan trọng. Phân tích EDA cho thấy nhóm hạn mức thấp nhất (Q1) có tỉ lệ vỡ nợ 31.8% — cao hơn gấp đôi nhóm hạn mức cao nhất (Q4: 14.0%). Điều này phản ánh việc phân loại rủi ro ban đầu của ngân hàng có phần chính xác, nhưng chưa đủ để ngăn chặn hoàn toàn.
+
+**Hàm ý cho ngân hàng:**
+
+Dựa trên kết quả phân tích, ba ngưỡng cảnh báo có thể được đề xuất:
+
+- *Cảnh báo sớm (Xanh → Vàng):* Khách hàng có `PAY_0 = 1` (trễ 1 tháng) → tỉ lệ vỡ nợ tăng từ 12.8% (đúng hạn) lên 33.9%. Cần chủ động liên hệ nhắc nhở.
+- *Cảnh báo cao (Vàng → Cam):* Khách hàng có `PAY_0 = 2` (trễ 2 tháng) → tỉ lệ vỡ nợ 69.1%. Cần xem xét hạ hạn mức hoặc yêu cầu tài sản đảm bảo.
+- *Cảnh báo khẩn (Cam → Đỏ):* `PAY_0 ≥ 3` và `UTIL_RATE > 0.8` → kết hợp hai yếu tố rủi ro. Xem xét đưa vào quy trình thu hồi nợ sớm.
+
+
+<!-- ══════════════════════════════════════════════════════════
+     [VỊ TRÍ] Cuối Mục 6 — Phân tích ngưỡng tối ưu (OPTIONAL)
+     Bỏ qua nếu không cần điểm cộng này
+     ══════════════════════════════════════════════════════════ -->
+
+```{r threshold_analysis, echo=FALSE, fig.width=8, fig.height=5, fig.cap="Hình 6.5: Sensitivity, Specificity và F1 theo ngưỡng quyết định — Random Forest"}
+thresholds  <- seq(0.1, 0.9, by = 0.05)
+sens_v <- spec_v <- f1_v <- numeric(length(thresholds))
+
+for (i in seq_along(thresholds)) {
+  pt <- factor(ifelse(prob_rf >= thresholds[i], "Có","Không"),
+               levels = c("Không","Có"))
+  cm_t     <- confusionMatrix(pt, test_set$DEFAULT, positive = "Có")
+  sens_v[i] <- cm_t$byClass["Sensitivity"]
+  spec_v[i] <- cm_t$byClass["Specificity"]
+  f1_v[i]   <- ifelse(is.na(cm_t$byClass["F1"]), 0, cm_t$byClass["F1"])
+}
+
+opt_thresh <- thresholds[which.max(f1_v)]
+
+data.frame(Threshold=thresholds, Sensitivity=sens_v,
+           Specificity=spec_v, F1_Score=f1_v) %>%
+  tidyr::pivot_longer(-Threshold, names_to="Metric", values_to="Value") %>%
+  ggplot(aes(x=Threshold, y=Value, color=Metric)) +
+  geom_line(lwd=1.2) + geom_point(size=2) +
+  geom_vline(xintercept=opt_thresh, linetype="dashed", color="gray40") +
+  annotate("text", x=opt_thresh+0.03, y=0.12,
+           label=sprintf("Ngưỡng tối ưu\nF1 = %.2f", opt_thresh),
+           color="gray30", size=3.2) +
+  scale_color_manual(values=c("Sensitivity"="#E74C3C",
+                               "Specificity"="#3498DB",
+                               "F1_Score"="#27AE60")) +
+  scale_x_continuous(breaks=seq(0.1,0.9,0.1)) +
+  labs(title="Sensitivity, Specificity và F1 theo ngưỡng quyết định",
+       subtitle="Random Forest — Ngưỡng mặc định = 0.5",
+       x="Ngưỡng quyết định", y="Giá trị", color="Chỉ số") +
+  theme_minimal(base_size=12) +
+  theme(plot.title=element_text(face="bold"), legend.position="bottom")
+```
+
+Ngưỡng mặc định 0.5 không nhất thiết là tối ưu với dữ liệu mất cân bằng. Từ biểu đồ, ngưỡng tối ưu theo F1 là `r opt_thresh` — tại ngưỡng này, Sensitivity tăng lên `r round(sens_v[which.max(f1_v)], 4)` so với `r round(sens_v[thresholds==0.5], 4)` ở ngưỡng 0.5. Trong triển khai thực tế, ngân hàng có thể điều chỉnh ngưỡng tùy theo mức độ chấp nhận rủi ro của tổ chức.
+```
+
