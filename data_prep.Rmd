@@ -1,0 +1,87 @@
+---
+title: "Data_prep"
+output: html_document
+date: "2026-06-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+library(dplyr)
+library(tidyverse)
+
+```{r}
+#Đọc dữ liệliệu
+credit <- read.csv("UCI_Credit_Card.csv")
+
+head(credit)
+dim(credit)
+str(credit)
+```
+
+```{r}
+#Kiểm tra những dữ liệu còn thiếu
+colSums(is.na(credit))
+#Tổng số những số liệu còn thiếu (Nếu có)
+sum(is.na(credit))
+```
+
+```{r}
+#kiểm tra dữ liệu trùng lăp
+sum(duplicated(credit))
+
+credit <- credit[!duplicated(credit), ]
+```
+
+```{r}
+#Chuyển các biến phân loại sang factor
+credit$SEX <- as.factor(credit$SEX)
+credit$EDUCATION <- as.factor(credit$EDUCATION)
+credit$MARRIAGE <- as.factor(credit$MARRIAGE)
+credit$default.payment.next.month <-
+  as.factor(credit$default.payment.next.month)
+
+str(credit)
+```
+
+```{r}
+#Dùng list để nhóm dữ liệu thành các phần chức năng
+credit_list <- list(
+  Customer = credit[, c("ID","LIMIT_BAL","SEX","AGE")],
+  Bill = credit[, grep("BILL_AMT", names(credit))],
+  Payment = credit[, grep("PAY_AMT", names(credit))]
+)
+
+names(credit_list)
+```
+
+```{r}
+#Dùng matrix dể tính tổng dư nợ của mỗi khách hàng
+bill_matrix <- as.matrix(
+  credit[, grep("BILL_AMT", names(credit))]
+)
+
+credit$total_bill <- rowSums(bill_matrix)
+
+head(credit$total_bill)
+```
+
+```{r}
+#Lọc ra những khách hàng có dư nợ cao
+high_debt <- subset(
+  credit,
+  total_bill > 500000
+)
+
+head(high_debt)
+```
+
+```{r}
+#Dùng summary để thống kê mô tả dữ liệu
+summary(credit)
+table(credit$default.payment.next.month)
+```
+
+
+
