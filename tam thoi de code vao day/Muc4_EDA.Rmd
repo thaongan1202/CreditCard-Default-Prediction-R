@@ -1,0 +1,510 @@
+<!-- ============================================================
+MỤC 4: TRỰC QUAN HÓA DỮ LIỆU (EDA)
+============================================================ -->
+
+## 4. Trực quan hóa dữ liệu (EDA)
+
+```{r load-dependencies, include=FALSE}
+if (!exists("credit_clean")) {
+  dataprep_file <- list.files(pattern = "^data_prep.*\\.Rmd$")[1]
+  if (is.na(dataprep_file)) stop("Không tìm thấy file data_prep...Rmd.")
+  tmp_r <- tempfile(fileext = ".R")
+  knitr::purl(dataprep_file, output = tmp_r, quiet = TRUE)
+  source(tmp_r)
+}
+```
+
+```{r eda-setup-b, include=FALSE}
+library(tidyverse)
+library(scales)
+library(corrplot)
+library(gridExtra)
+library(ggtext)      # để dùng element_markdown nếu cần
+
+stopifnot(exists("credit_clean"))
+
+credit_eda <- credit_clean %>%
+  mutate(
+    DEFAULT = recode(default.payment.next.month,
+                     "No Default" = "Không vỡ nợ",
+                     "Default"    = "Vỡ nợ") %>%
+      factor(levels = c("Không vỡ nợ", "Vỡ nợ")),
+
+    SEX_label = recode(SEX, "Male" = "Nam", "Female" = "Nữ") %>%
+      factor(levels = c("Nam", "Nữ")),
+
+    EDUCATION_label = recode(EDUCATION,
+                             "Graduate School" = "Sau đại học",
+                             "University"      = "Đại học",
+                             "High School"     = "Trung học",
+                             "Others"          = "Khác") %>%
+      factor(levels = c("Sau đại học", "Đại học", "Trung học", "Khác")),
+
+    MARRIAGE_label = recode(MARRIAGE,
+                            "Married" = "Đã kết hôn",
+                            "Single"  = "Độc thân",
+                            "Others"  = "Khác") %>%
+      factor(levels = c("Đã kết hôn", "Độc thân", "Khác")),
+
+    # Nhãn dễ đọc cho PAY_0 — dùng ở biểu đồ 4.4c
+    PAY_0_label = case_when(
+      PAY_0 <= -1 ~ "Đúng hạn\n/ sớm",
+      PAY_0 ==  0 ~ "Sử dụng\ntoàn bộ",
+      PAY_0 ==  1 ~ "Trễ\n1 tháng",
+      PAY_0 ==  2 ~ "Trễ\n2 tháng",
+      PAY_0 ==  3 ~ "Trễ\n3 tháng",
+      TRUE        ~ "Trễ\n≥4 tháng"
+    ) %>%
+      factor(levels = c("Đúng hạn\n/ sớm", "Sử dụng\ntoàn bộ",
+                        "Trễ\n1 tháng", "Trễ\n2 tháng",
+                        "Trễ\n3 tháng", "Trễ\n≥4 tháng"))
+  )
+
+# Bảng màu thống nhất toàn bộ Mục 4
+palette_default <- c("Không vỡ nợ" = "#2E86AB", "Vỡ nợ" = "#C73E3E")
+
+# Theme chung — áp dụng cho toàn bộ biểu đồ để đồng bộ
+theme_b <- function(base = 11) {
+  theme_minimal(base_size = base) +
+    theme(
+      plot.title       = element_text(face = "bold", size = base + 1),
+      plot.subtitle    = element_text(size = base - 1, color = "grey40"),
+      axis.title       = element_text(size = base - 0.5),
+      panel.grid.minor = element_blank(),
+      legend.position  = "bottom",
+      legend.title     = element_text(size = base - 1),
+      legend.text      = element_text(size = base - 1)
+    )
+}
+```
+
+Phần này khám phá dữ liệu sau xử lý (30.000 khách hàng, không có giá trị
+thiếu, không có dòng trùng lặp) nhằm (1) hiểu cấu trúc tổng thể của khách
+hàng trong mẫu, và (2) xác định những biến có khả năng liên quan đến hành
+vi vỡ nợ, làm cơ sở cho chiến lược mô hình hóa ở Mục 5.
+
+---
+
+### 4.1 Phân tích phân phối biến mục tiêu
+
+```{r eda-4-1-target, fig.width=5.5, fig.height=4, fig.align='center', fig.cap="Hình 4.1. Phân phối biến mục tiêu (DEFAULT)"}
+target_summary <- credit_eda %>%
+  count(DEFAULT) %>%
+  mutate(pct = n / sum(n))
+
+ggplot(target_summary, aes(x = DEFAULT, y = n, fill = DEFAULT)) +
+  geom_col(width = 0.52, show.legend = FALSE) +
+  geom_text(
+    aes(label = paste0(comma(n, big.mark = "."),
+                       "\n(", percent(pct, accuracy = 0.01), ")")),
+    vjust = -0.3, size = 4, fontface = "bold"
+  ) +
+  scale_fill_manual(values = palette_default) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.18)),
+                     labels = comma_format(big.mark = ".")) +
+  labs(
+    title    = "Phân phối biến mục tiêu",
+    subtitle = "Mất cân bằng lớp ~3.5:1 — cần ưu tiên AUC/F1 khi đánh giá mô hình",
+    x = NULL, y = "Số khách hàng"
+  ) +
+  theme_b(12)
+```
+
+**Nhận xét:** 23.364 khách hàng không vỡ nợ (**77,88%**) so với 6.636
+khách hàng vỡ nợ (**22,12%**). Đây là bài toán phân loại mất cân bằng
+vừa phải — một mô hình "ngây thơ" luôn dự đoán "không vỡ nợ" vẫn đạt
+Accuracy ~78% nhưng hoàn toàn không phát hiện được trường hợp rủi ro nào
+(Recall = 0%). Vì vậy nhóm ưu tiên Precision/Recall/F1/AUC-ROC ở Mục 6.
+
+---
+
+### 4.2 Phân tích đơn biến — Đặc điểm nhân khẩu học
+
+```{r eda-4-2-demographic, fig.width=11, fig.height=4.2, fig.cap="Hình 4.2. Cơ cấu khách hàng theo giới tính, trình độ học vấn và tình trạng hôn nhân"}
+plot_count <- function(data, var, var_label) {
+  df_tmp <- data %>% count(.data[[var]])
+  ggplot(df_tmp, aes(x = .data[[var]], y = n)) +
+    geom_col(fill = "#2E86AB", alpha = 0.88, width = 0.6) +
+    geom_text(aes(label = comma(n, big.mark = ".")),
+              vjust = -0.35, size = 3.2, fontface = "bold", color = "#1E2761") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.18)),
+                       labels = comma_format(big.mark = ".")) +
+    labs(title = var_label, x = NULL, y = "Số khách hàng") +
+    theme_b(10) +
+    theme(axis.text.x = element_text(angle = 15, hjust = 1))
+}
+
+grid.arrange(
+  plot_count(credit_eda, "SEX_label",       "Giới tính"),
+  plot_count(credit_eda, "EDUCATION_label", "Trình độ học vấn"),
+  plot_count(credit_eda, "MARRIAGE_label",  "Tình trạng hôn nhân"),
+  ncol = 3
+)
+```
+
+```{r eda-4-2-age, fig.width=7, fig.height=3.8, fig.align='center', fig.cap="Hình 4.3. Phân phối độ tuổi khách hàng"}
+age_mean   <- mean(credit_eda$AGE)
+age_median <- median(credit_eda$AGE)
+
+ggplot(credit_eda, aes(x = AGE)) +
+  geom_histogram(bins = 30, fill = "#2E86AB", color = "white", alpha = 0.85) +
+  geom_vline(xintercept = age_mean,   linetype = "dashed",
+             color = "#C73E3E", linewidth = 0.9) +
+  geom_vline(xintercept = age_median, linetype = "dotted",
+             color = "#1E2761", linewidth = 0.9) +
+  annotate("text", x = age_mean + 1.5, y = Inf, vjust = 1.8,
+           label = paste0("Mean = ", round(age_mean, 1)),
+           color = "#C73E3E", size = 3.5, hjust = 0) +
+  annotate("text", x = age_median - 1.5, y = Inf, vjust = 3.4,
+           label = paste0("Median = ", age_median),
+           color = "#1E2761", size = 3.5, hjust = 1) +
+  scale_x_continuous(breaks = seq(20, 80, 10)) +
+  labs(title    = "Phân phối độ tuổi khách hàng",
+       subtitle = "Đường đỏ = Mean (35.5), đường xanh = Median (34) — phân phối lệch phải nhẹ",
+       x = "Tuổi", y = "Tần suất") +
+  theme_b(11)
+```
+
+**Nhận xét:** Nữ chiếm đa số (18.112 — 60,4%). Học vấn tập trung chủ yếu
+ở nhóm Đại học (14.030) và Sau đại học (10.585). Độ tuổi trung bình 35,5
+với phân phối lệch phải nhẹ — khách hàng trẻ chiếm đa số, nhóm lớn tuổi
+kéo đuôi phải.
+
+---
+
+### 4.3 Phân tích đơn biến — Đặc điểm tài chính
+
+```{r eda-4-3-limit-bal, fig.width=7, fig.height=3.8, fig.align='center', fig.cap="Hình 4.4. Phân phối hạn mức tín dụng (LIMIT_BAL)"}
+lim_mean   <- mean(credit_eda$LIMIT_BAL)
+lim_median <- median(credit_eda$LIMIT_BAL)
+
+ggplot(credit_eda, aes(x = LIMIT_BAL)) +
+  geom_histogram(bins = 40, fill = "#2E86AB", color = "white", alpha = 0.85) +
+  geom_vline(xintercept = lim_mean,   linetype = "dashed",
+             color = "#C73E3E", linewidth = 0.9) +
+  geom_vline(xintercept = lim_median, linetype = "dotted",
+             color = "#1E2761", linewidth = 0.9) +
+  annotate("text", x = lim_mean + 15000, y = Inf, vjust = 1.8,
+           label = paste0("Mean = ", comma(lim_mean, big.mark = ".")),
+           color = "#C73E3E", size = 3.3, hjust = 0) +
+  annotate("text", x = lim_median - 15000, y = Inf, vjust = 3.4,
+           label = paste0("Median = ", comma(lim_median, big.mark = ".")),
+           color = "#1E2761", size = 3.3, hjust = 1) +
+  scale_x_continuous(labels = comma_format(big.mark = ".")) +
+  labs(title    = "Phân phối hạn mức tín dụng (LIMIT_BAL)",
+       subtitle = "Đơn vị: NT$ — Phân phối lệch phải, Mean > Median",
+       x = "Hạn mức tín dụng (NT$)", y = "Tần suất") +
+  theme_b(11)
+```
+
+```{r eda-4-3-bill-pay, fig.width=11, fig.height=4.8, fig.cap="Hình 4.5. Phân phối dư nợ và thanh toán theo từng tháng (đã cắt trục tại p97 để dễ đọc — số liệu thực có outlier lên tới ~1.6 triệu NT$)"}
+# Giới hạn trục tại p97 để boxplot hiển thị rõ IQR/median
+# Outlier vượt ngưỡng vẫn được giữ trong dữ liệu, chỉ không hiển thị
+bill_cap <- quantile(
+  unlist(select(credit_eda, starts_with("BILL_AMT"))), 0.97, na.rm = TRUE)
+pay_cap  <- quantile(
+  unlist(select(credit_eda, starts_with("PAY_AMT"))),  0.97, na.rm = TRUE)
+
+bill_long <- credit_eda %>%
+  select(starts_with("BILL_AMT")) %>%
+  pivot_longer(everything(), names_to = "Thang", values_to = "gia_tri") %>%
+  mutate(Thang = factor(Thang, levels = paste0("BILL_AMT", 1:6),
+                        labels = paste0("T", 1:6)))
+
+pay_long <- credit_eda %>%
+  select(starts_with("PAY_AMT")) %>%
+  pivot_longer(everything(), names_to = "Thang", values_to = "gia_tri") %>%
+  mutate(Thang = factor(Thang, levels = paste0("PAY_AMT", 1:6),
+                        labels = paste0("T", 1:6)))
+
+p_bill <- ggplot(bill_long, aes(x = Thang, y = gia_tri)) +
+  geom_boxplot(fill = "#2E86AB", alpha = 0.75,
+               outlier.shape = NA) +          # ẩn outlier để gọn
+  coord_cartesian(ylim = c(NA, bill_cap)) +   # cắt trục, không xóa data
+  scale_y_continuous(labels = comma_format(big.mark = ".")) +
+  labs(title    = "Dư nợ hàng tháng (BILL_AMT1–6)",
+       subtitle = paste0("Trục cắt tại p97 ≈ ",
+                         comma(round(bill_cap), big.mark = "."), " NT$"),
+       x = NULL, y = "NT$") +
+  theme_b(10)
+
+p_pay <- ggplot(pay_long, aes(x = Thang, y = gia_tri)) +
+  geom_boxplot(fill = "#C73E3E", alpha = 0.75,
+               outlier.shape = NA) +
+  coord_cartesian(ylim = c(NA, pay_cap)) +
+  scale_y_continuous(labels = comma_format(big.mark = ".")) +
+  labs(title    = "Số tiền thanh toán (PAY_AMT1–6)",
+       subtitle = paste0("Trục cắt tại p97 ≈ ",
+                         comma(round(pay_cap), big.mark = "."), " NT$"),
+       x = NULL, y = "NT$") +
+  theme_b(10)
+
+grid.arrange(p_bill, p_pay, ncol = 2)
+```
+
+**Nhận xét:** LIMIT_BAL lệch phải (Mean 167.484 > Median 140.000 NT$).
+BILL_AMT và PAY_AMT lệch phải rất mạnh với outlier lên tới ~1,6 triệu
+NT$ — trục biểu đồ được cắt tại phân vị thứ 97 để hiển thị rõ phần
+phân phối chính; dữ liệu gốc không bị thay đổi. Đặc điểm này gợi ý
+cần log-transform hoặc chuẩn hóa trước khi đưa vào Hồi quy Tuyến tính
+(Mục 3.3.4).
+
+---
+
+### 4.4 Phân tích đa biến — Mối quan hệ với khả năng vỡ nợ
+
+```{r eda-4-4-categorical-vs-target, fig.width=11, fig.height=4.8, fig.cap="Hình 4.6. Tỷ lệ vỡ nợ theo giới tính, học vấn và hôn nhân"}
+# Hàm vẽ stacked bar proportion — kèm nhãn % Vỡ nợ trực tiếp trên cột
+plot_prop_default <- function(data, var, var_label) {
+  # tính tỷ lệ để gán nhãn
+  df_pct <- data %>%
+    count(.data[[var]], DEFAULT) %>%
+    group_by(.data[[var]]) %>%
+    mutate(pct = n / sum(n)) %>%
+    ungroup() %>%
+    filter(DEFAULT == "Vỡ nợ")
+
+  ggplot(data, aes(x = .data[[var]], fill = DEFAULT)) +
+    geom_bar(position = "fill", alpha = 0.88) +
+    geom_text(
+      data    = df_pct,
+      aes(x   = .data[[var]], y = pct / 2,
+          label = percent(pct, accuracy = 0.1)),
+      inherit.aes = FALSE,
+      color = "white", fontface = "bold", size = 3.5
+    ) +
+    scale_y_continuous(labels = percent_format()) +
+    scale_fill_manual(values = palette_default) +
+    labs(title = var_label, x = NULL,
+         y = "Tỷ lệ (%)", fill = "Tình trạng") +
+    theme_b(10) +
+    theme(
+      axis.text.x     = element_text(angle = 15, hjust = 1),
+      legend.position = "none"   # legend chung ở bên ngoài
+    )
+}
+
+p1 <- plot_prop_default(credit_eda, "SEX_label",       "Giới tính")
+p2 <- plot_prop_default(credit_eda, "EDUCATION_label", "Học vấn")
+p3 <- plot_prop_default(credit_eda, "MARRIAGE_label",  "Hôn nhân")
+
+# Thêm legend chung ở đáy
+legend_plot <- ggplot(credit_eda, aes(x = SEX_label, fill = DEFAULT)) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = palette_default,
+                    labels  = c("Không vỡ nợ", "Vỡ nợ")) +
+  theme_b(10) +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Tình trạng:", title.hjust = 0.5))
+shared_legend <- cowplot::get_legend(legend_plot)
+
+# Nếu chưa cài cowplot, dùng cách đơn giản:
+grid.arrange(p1, p2, p3, ncol = 3,
+             top = grid::textGrob(
+               "Tỷ lệ vỡ nợ trong từng nhóm nhân khẩu học\n(số trên cột = % Vỡ nợ)",
+               gp = grid::gpar(fontsize = 11, fontface = "bold")))
+```
+
+```{r eda-4-4-limit-bal-vs-target, fig.width=6, fig.height=4.5, fig.align='center', fig.cap="Hình 4.7. Hạn mức tín dụng (LIMIT_BAL) theo tình trạng vỡ nợ"}
+ggplot(credit_eda, aes(x = DEFAULT, y = LIMIT_BAL, fill = DEFAULT)) +
+  geom_boxplot(alpha = 0.85, outlier.alpha = 0.15,
+               outlier.size = 0.8, width = 0.45) +
+  stat_summary(fun = mean, geom = "point",
+               shape = 23, size = 3, fill = "white",
+               color = "black") +           # hình thoi trắng = Mean
+  scale_fill_manual(values = palette_default) +
+  scale_y_continuous(labels = comma_format(big.mark = ".")) +
+  labs(title    = "Hạn mức tín dụng theo tình trạng vỡ nợ",
+       subtitle = "Hình thoi trắng = Mean | Đường giữa = Median",
+       x = NULL, y = "Hạn mức tín dụng (NT$)") +
+  theme_b(11) +
+  theme(legend.position = "none")
+```
+
+```{r eda-4-4-limit-quartile-table}
+quartile_table <- credit_eda %>%
+  mutate(
+    Tứ_phân_vị = ntile(LIMIT_BAL, 4),
+    Tứ_phân_vị = case_when(
+      Tứ_phân_vị == 1 ~ "Q1 (thấp nhất, ≤50k)",
+      Tứ_phân_vị == 2 ~ "Q2 (50k–140k)",
+      Tứ_phân_vị == 3 ~ "Q3 (140k–240k)",
+      Tứ_phân_vị == 4 ~ "Q4 (cao nhất, >240k)"
+    )
+  ) %>%
+  group_by(Tứ_phân_vị) %>%
+  summarise(
+    `Số KH`       = n(),
+    `Tỷ lệ vỡ nợ` = percent(mean(DEFAULT == "Vỡ nợ"), accuracy = 0.1),
+    .groups = "drop"
+  )
+
+knitr::kable(quartile_table,
+             caption = "Bảng 4.4. Tỷ lệ vỡ nợ theo tứ phân vị LIMIT_BAL",
+             align   = c("l","r","r"))
+```
+
+```{r eda-4-4-pay0-critical, fig.width=9, fig.height=5, fig.cap="Hình 4.8. Tỷ lệ vỡ nợ theo trạng thái thanh toán gần nhất (PAY_0)"}
+# Nhãn dễ đọc cho PAY_0; nhóm PAY_0 >= 4 (n nhỏ) vào "Trễ ≥4 tháng"
+pay0_plot_data <- credit_eda %>%
+  mutate(
+    PAY_0_nhom = case_when(
+      PAY_0 <= -1 ~ "Đúng hạn\n/ sớm",
+      PAY_0 ==  0 ~ "Sử dụng\ntoàn bộ",
+      PAY_0 ==  1 ~ "Trễ\n1 tháng",
+      PAY_0 ==  2 ~ "Trễ\n2 tháng",
+      PAY_0 ==  3 ~ "Trễ\n3 tháng",
+      TRUE        ~ "Trễ\n≥4 tháng"
+    ) %>%
+      factor(levels = c("Đúng hạn\n/ sớm", "Sử dụng\ntoàn bộ",
+                        "Trễ\n1 tháng", "Trễ\n2 tháng",
+                        "Trễ\n3 tháng", "Trễ\n≥4 tháng"))
+  )
+
+# Tính tỷ lệ để gán nhãn % vỡ nợ
+pay0_pct <- pay0_plot_data %>%
+  count(PAY_0_nhom, DEFAULT) %>%
+  group_by(PAY_0_nhom) %>%
+  mutate(pct = n / sum(n)) %>%
+  filter(DEFAULT == "Vỡ nợ")
+
+ggplot(pay0_plot_data, aes(x = PAY_0_nhom, fill = DEFAULT)) +
+  geom_bar(position = "fill", alpha = 0.88) +
+  geom_text(
+    data    = pay0_pct,
+    aes(x   = PAY_0_nhom, y = pct / 2,
+        label = percent(pct, accuracy = 0.1)),
+    inherit.aes = FALSE,
+    color = "white", fontface = "bold", size = 4
+  ) +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = palette_default) +
+  labs(
+    title    = "Tỷ lệ vỡ nợ theo trạng thái thanh toán gần nhất (PAY_0)",
+    subtitle = "Biến dự báo mạnh nhất: từ 13,8% (đúng hạn) → 75,8% (trễ 3 tháng)\n(số trên cột = % Vỡ nợ trong nhóm đó)",
+    x    = "Trạng thái PAY_0",
+    y    = "Tỷ lệ (%)",
+    fill = "Tình trạng"
+  ) +
+  theme_b(12) +
+  theme(legend.position = "bottom")
+```
+
+```{r eda-4-4-true-multivariate, fig.width=8.5, fig.height=5.5, fig.align='center', fig.cap="Hình 4.9. Tỷ lệ vỡ nợ theo PAY_0 × Tứ phân vị hạn mức tín dụng (phân tích đa biến)"}
+heatmap_data <- credit_eda %>%
+  mutate(
+    limit_quartile = ntile(LIMIT_BAL, 4),
+    limit_label    = case_when(
+      limit_quartile == 1 ~ "Q1\n(≤50k)",
+      limit_quartile == 2 ~ "Q2\n(50-140k)",
+      limit_quartile == 3 ~ "Q3\n(140-240k)",
+      limit_quartile == 4 ~ "Q4\n(>240k)"
+    ) %>%
+      factor(levels = c("Q1\n(≤50k)", "Q2\n(50-140k)",
+                        "Q3\n(140-240k)", "Q4\n(>240k)")),
+    PAY_0_nhom = case_when(
+      PAY_0 <= -1 ~ "Đúng hạn\n/ sớm",
+      PAY_0 ==  0 ~ "Sử dụng\ntoàn bộ",
+      PAY_0 ==  1 ~ "Trễ\n1 tháng",
+      PAY_0 ==  2 ~ "Trễ\n2 tháng",
+      PAY_0 ==  3 ~ "Trễ\n3 tháng",
+      TRUE        ~ "Trễ\n≥4 tháng"
+    ) %>%
+      factor(levels = c("Đúng hạn\n/ sớm", "Sử dụng\ntoàn bộ",
+                        "Trễ\n1 tháng", "Trễ\n2 tháng",
+                        "Trễ\n3 tháng", "Trễ\n≥4 tháng"))
+  ) %>%
+  group_by(limit_label, PAY_0_nhom) %>%
+  summarise(
+    ty_le_vo_no = mean(DEFAULT == "Vỡ nợ"),
+    so_luong    = n(),
+    .groups     = "drop"
+  ) %>%
+  filter(so_luong >= 30)   # bỏ ô quá ít quan sát
+
+ggplot(heatmap_data,
+       aes(x = PAY_0_nhom, y = limit_label, fill = ty_le_vo_no)) +
+  geom_tile(color = "white", linewidth = 0.8) +
+  geom_text(
+    aes(label = percent(ty_le_vo_no, accuracy = 1),
+        color  = ty_le_vo_no > 0.45),   # chữ trắng khi ô tối
+    fontface = "bold", size = 3.8
+  ) +
+  scale_fill_gradient(low = "#2E86AB", high = "#C73E3E",
+                      labels = percent_format(), name = "Tỷ lệ vỡ nợ") +
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "white"),
+                     guide = "none") +
+  labs(
+    title    = "Tỷ lệ vỡ nợ: PAY_0 × Tứ phân vị LIMIT_BAL",
+    subtitle = "Khi trễ hạn ≥2 tháng, tỷ lệ vỡ nợ rất cao (~68–86%)\nvà gần như không còn phụ thuộc vào hạn mức tín dụng",
+    x = "Trạng thái PAY_0",
+    y = "Tứ phân vị LIMIT_BAL"
+  ) +
+  theme_b(11) +
+  theme(legend.position  = "right",
+        axis.text.y      = element_text(size = 9),
+        panel.grid.major = element_blank())
+```
+
+**Nhận xét tổng hợp Mục 4.4:**
+
+- **Nhân khẩu học** (Hình 4.6): khác biệt tỷ lệ vỡ nợ giữa các nhóm giới
+  tính, học vấn, hôn nhân ở mức khiêm tốn (≤6 điểm %).
+- **LIMIT_BAL** (Hình 4.7, Bảng 4.4): tỷ lệ vỡ nợ giảm rõ từ 31,8% (Q1) xuống
+  14,0% (Q4) — quan hệ nghịch biến nhưng có thể phi tuyến.
+- **PAY_0** (Hình 4.8): biến dự báo mạnh nhất — tỷ lệ tăng vọt và phi tuyến
+  từ 13,8% (đúng hạn) lên 75,8% (trễ 3 tháng).
+- **Tương tác PAY_0 × LIMIT_BAL** (Hình 4.9): khi trễ hạn ≥2 tháng, hạn mức
+  tín dụng gần như mất tác dụng phân biệt rủi ro — PAY_0 chi phối hoàn toàn.
+
+---
+
+### 4.5 Phân tích tương quan
+
+```{r eda-4-5-correlation, fig.width=8, fig.height=8, fig.cap="Hình 4.10. Ma trận tương quan giữa các biến số liên tục"}
+numeric_vars <- credit_eda %>%
+  select(LIMIT_BAL, AGE,
+         starts_with("BILL_AMT"),
+         starts_with("PAY_AMT")) %>%
+  select(where(is.numeric))
+
+corr_matrix <- cor(numeric_vars, use = "complete.obs")
+
+corrplot(
+  corr_matrix,
+  method       = "color",
+  type         = "upper",
+  order        = "hclust",        # nhóm biến có tương quan gần nhau
+  tl.col       = "black",
+  tl.srt       = 45,
+  tl.cex       = 0.85,
+  addCoef.col  = "grey20",
+  number.cex   = 0.65,            # tăng từ 0.55 → 0.65 để dễ đọc
+  col          = colorRampPalette(c("#2E86AB", "white", "#C73E3E"))(200),
+  title        = "Ma trận tương quan giữa các biến số liên tục",
+  mar          = c(0, 0, 2, 0),
+  bg           = "white"
+)
+```
+
+**Nhận xét:** Cụm `BILL_AMT1`–`BILL_AMT6` tương quan với nhau rất cao
+(min 0,80 — max 0,95), thể hiện đa cộng tuyến nghiêm trọng. Cụm
+`PAY_AMT1`–`PAY_AMT6` tương quan thấp hơn nhiều. `LIMIT_BAL` và `AGE`
+gần như độc lập với các biến còn lại. Đề xuất cho Feature Engineering
+(Mục 3.3.4): tổng hợp `BILL_AMT1–6` thành 1–2 biến đại diện
+(trung bình hoặc xu hướng tăng/giảm 6 tháng) trước khi đưa vào mô hình
+hồi quy tuyến tính để tránh multicollinearity.
+
+---
+
+### 4.6 Kết luận sơ bộ từ EDA
+
+1. **Mất cân bằng lớp** (77,88% / 22,12%) → ưu tiên Precision/Recall/F1/AUC ở Mục 6.
+2. **PAY_0** là biến dự báo mạnh nhất (13,8% → 75,8% khi trễ 0 → 3 tháng)
+   — đề xuất thử cả dạng numeric và categorical khi xây mô hình.
+3. **LIMIT_BAL** nghịch biến với rủi ro (31,8% → 14,0% theo tứ phân vị) và
+   **tương tác với PAY_0** — khi khách hàng đã trễ hạn nặng, hạn mức tín
+   dụng gần như không còn phân biệt được rủi ro.
+4. **Biến nhân khẩu học** (SEX, EDUCATION, MARRIAGE) có ảnh hưởng yếu.
+5. **Đa cộng tuyến BILL_AMT1–6** (r > 0,80) cần xử lý trước mô hình
+   hồi quy tuyến tính (Mục 5).
