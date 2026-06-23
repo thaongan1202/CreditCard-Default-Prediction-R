@@ -169,9 +169,6 @@ credit-card-default-prediction/
 │   ├── UCI_Credit_Card.csv        ← Dataset gốc (30.000 × 25)
 │   └── data_dictionary.md        ← Mô tả chi tiết 25 biến
 │
-├── output/
-│   └── figures/                   ← Biểu đồ đã export (nếu có)
-│
 └── docs/
     ├── Bao_Cao_Word.docx          ← Báo cáo Word (nộp giáo viên)
     └── Slide_Thuyet_Trinh.pptx   ← Slide thuyết trình
