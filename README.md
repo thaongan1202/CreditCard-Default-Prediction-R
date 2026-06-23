@@ -127,13 +127,19 @@ Accuracy **không** được dùng làm chỉ số chính vì dữ liệu mất 
 
 ## 📈 Kết quả nổi bật
 
-> ⚠️ *Bảng dưới đây sẽ được cập nhật sau khi hoàn thành phân tích*
-
 | Mô hình | Accuracy | Sensitivity | AUC | F1-score |
 |---|---|---|---|---|
-| Hồi quy Logistic | — | — | — | — |
-| Cây quyết định | — | — | — | — |
-| **Random Forest** | — | — | — | — |
+| Hồi quy Logistic | 72.15% | 67.81% | 0.7541 | 0.5186 |
+| Cây quyết định | **76.31%** | 60.76% | 0.7378 | **0.5315** |
+| **Random Forest** | 72.73% | 66.91% | **0.7667** | 0.5205 |
+
+### Nhận xét
+
+- Cả ba mô hình đều đạt AUC lớn hơn 0.7, cho thấy khả năng dự đoán ở mức khá.
+- Cây quyết định đạt Accuracy cao nhất (76.31%) nhưng có Sensitivity thấp nhất, cho thấy mô hình bỏ sót nhiều trường hợp vỡ nợ hơn.
+- Hồi quy Logistic cho kết quả tương đối cân bằng và có ưu điểm dễ giải thích.
+- Random Forest đạt AUC cao nhất (0.7667), cho thấy khả năng phân biệt khách hàng vỡ nợ và không vỡ nợ tốt nhất trong ba mô hình.
+- Nhóm lựa chọn **Random Forest** là mô hình phù hợp nhất cho bài toán dự đoán khả năng vỡ nợ thẻ tín dụng.
 
 ### Phát hiện chính từ EDA
 
@@ -143,9 +149,11 @@ Accuracy **không** được dùng làm chỉ số chính vì dữ liệu mất 
 - **Hạn mức tín dụng thấp đi kèm rủi ro cao hơn:**  
   Nhóm hạn mức thấp nhất (Q1) có tỷ lệ vỡ nợ **31.8%**, cao hơn gấp đôi nhóm hạn mức cao nhất (Q4: 14.0%).
 
-- **Đa cộng tuyến trong nhóm BILL_AMT:**  
-  Sáu biến `BILL_AMT1–6` có hệ số tương quan lẫn nhau > 0.80 (cao nhất: r = 0.95 giữa BILL_AMT1 và BILL_AMT2), được xử lý bằng cách tổng hợp thành biến `UTILIZATION_RATE`.
+- **Random Forest cho hiệu suất tốt nhất:**  
+  Mô hình đạt AUC = **0.7667**, cao nhất trong ba mô hình được thử nghiệm.
 
+- **Đa cộng tuyến trong nhóm BILL_AMT:**  
+  Sáu biến `BILL_AMT1–6` có hệ số tương quan cao và được tổng hợp thành biến `UTILIZATION_RATE` trong quá trình Feature Engineering.
 ---
 
 ## 📁 Cấu trúc dự án
@@ -207,10 +215,10 @@ rmarkdown::render("Main_Report.Rmd", output_format = "html_document")
 
 | STT | Thành viên | MSSV | Nhiệm vụ chính |
 |---|---|---|---|
-| 1 | Lâm Ngọc Yến Vy | [MSSV] | Tiền xử lý dữ liệu, Feature Engineering |
-| 2 | Trần Thị Quế Trân | [MSSV] | EDA, Trực quan hóa dữ liệu |
-| 3 | Tô Thuỷ Tiên | [MSSV] | Mô hình Logistic Regression, Decision Tree |
-| 4 | Phạm Thị Thảo Ngân | [MSSV] | Random Forest, Tích hợp & QA, README |
+| 1 | Lâm Ngọc Yến Vy | 24133076 | Tiền xử lý dữ liệu, Feature Engineering |
+| 2 | Trần Thị Quế Trân | 24133067 | EDA, Trực quan hóa dữ liệu |
+| 3 | Tô Thuỷ Tiên | 24133062 | Mô hình Logistic Regression, Decision Tree |
+| 4 | Phạm Thị Thảo Ngân | 24133041 | Random Forest, Tích hợp & QA, README |
 
 ---
 
