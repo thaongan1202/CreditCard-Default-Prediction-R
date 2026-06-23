@@ -187,8 +187,8 @@ credit-card-default-prediction/
 
 **Bước 1 — Clone repository:**
 ```bash
-git clone https://github.com/[username]/credit-card-default-prediction.git
-cd credit-card-default-prediction
+git clone https://github.com/thaongan1202/CreditCard-Default-Prediction-R.git
+cd CreditCard-Default-Prediction-R
 ```
 
 **Bước 2 — Cài đặt thư viện:** Mở R/RStudio và chạy lệnh sau (chỉ cần làm một lần):
