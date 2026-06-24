@@ -226,6 +226,15 @@ credit_list <- list(
 cat("Các nhóm trong credit_list:", names(credit_list), "\n")
 ```
 
+```{r su_dung_matrix}
+# Dùng matrix để tính tổng dư nợ 
+bill_matrix <- as.matrix(credit_clean[,grep("BILL_AMT", names(credit_clean))])
+credit_clean$total_bill <- rowSums(bill_matrix) 
+
+high_debt <- subset(credit_clean, total_bill > 500000)
+cat("Số khách hàng có tổng dư nợ > 500.000 NT$:", nrow(high_debt), "\n")
+```
+
 ```{r feature_engineering}
 credit_final <- credit_clean %>%
   select(-ID) %>%
