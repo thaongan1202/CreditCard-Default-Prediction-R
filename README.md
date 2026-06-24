@@ -159,7 +159,7 @@ Accuracy **không** được dùng làm chỉ số chính vì dữ liệu mất 
 ## 📁 Cấu trúc dự án
 
 ```
-credit-card-default-prediction/
+CreditCard-Default-Prediction-R/
 │
 ├── README.md                      ← Tài liệu tổng quan (file này)
 ├── Main_Report.Rmd                ← File Rmarkdown chính — chạy để reproduce
