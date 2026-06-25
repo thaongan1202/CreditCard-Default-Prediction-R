@@ -122,19 +122,32 @@ tín dụng của 30.000 khách hàng tại Đài Loan trong giai đoạn tháng
 ##  Mô tả biến
 
 Bộ dữ liệu gốc có 25 biến, có thể chia thành 5 nhóm:
+- **Nhóm nhân khẩu học:** `SEX`, `EDUCATION`, `MARRIAGE`, `AGE`
+  - Mô tả đặc điểm cá nhân của khách hàng như giới tính, trình độ học vấn, tình trạng hôn nhân và tuổi.
 
-|      Nhóm          |            Biến               |                      Mô tả                        |
-|--------------------|-------------------------------|---------------------------------------------------|
-| Nhân khẩu học      | SEX, EDUCATION, MARRIAGE, AGE | Giới tính, học vấn, hôn nhân, tuổi                |
-| Tài chính          | LIMIT_BAL                     | Hạn mức tín dụng (đơn vị: NT$ — Đô la Đài Loan)   |
-| Lịch sử thanh toán | PAY_0 → PAY_6                 | Trạng thái thanh toán tháng 9→4/2005.             |
-|                    |                               |    Giá trị: -2 = không dùng thẻ,-1 = đúng hạn,    |  
-|                    |                               |    0 = trả số tiền tối thiểu (minimum payment),   |  
-|                    |                               |    1 = trễ 1 tháng, 2 = trễ 2 tháng, ......       |
-| Dư nợ sao kê       | BILL_AMT1 → BILL_AMT6         | Số dư sao kê tháng 9→4/2005 (NT$)                 |
-| Số tiền đã trả     | PAY_AMT1 → PAY_AMT6           | Số tiền thực tế đã thanh toán tháng 9→4/2005 (NT$)|
-| Biến mục tiêu      | DEFAULT                       | Vỡ nợ tháng tới: 1 = Có, 0 = Không                |
+- **Nhóm tài chính:** `LIMIT_BAL`
+  - Hạn mức tín dụng được cấp cho khách hàng (đơn vị: NT$).
 
+- **Nhóm lịch sử thanh toán:** `PAY_0` đến `PAY_6`
+  - Thể hiện trạng thái thanh toán của khách hàng từ tháng 9 đến tháng 4 năm 2005.
+  - Giá trị:
+    - `-2`: Không sử dụng tín dụng
+    - `-1`: Thanh toán đúng hạn
+    - `0`: Thanh toán tối thiểu
+    - `1`: Trễ 1 tháng
+    - `2`: Trễ 2 tháng
+    - ...
+
+- **Nhóm dư nợ sao kê:** `BILL_AMT1` đến `BILL_AMT6`
+  - Số dư sao kê thẻ tín dụng trong từng tháng (NT$).
+
+- **Nhóm số tiền đã thanh toán:** `PAY_AMT1` đến `PAY_AMT6`
+  - Số tiền thực tế khách hàng đã thanh toán trong từng tháng (NT$).
+
+- **Biến mục tiêu:** `DEFAULT`
+  - Cho biết khách hàng có vỡ nợ trong tháng tiếp theo hay không.
+  - `1`: Có vỡ nợ.
+  - `0`: Không vỡ nợ.
 ##  Tiền xử lý dữ liệu
 
 ###  Đọc và kiểm tra dữ liệu
@@ -587,13 +600,10 @@ so với nhóm **Vỡ nợ** (median cao hơn, box rộng hơn về phía trên)
 tứ phân vị xác nhận xu hướng **nghịch biến** rõ ràng giữa hạn mức và rủi
 ro:
 
-| Nhóm hạn mức | Tỷ lệ vỡ nợ |
-|---|---|
-| Q1 — Thấp nhất (≤50.000 NT$) | **31,8%** |
-| Q2 — 50k–140k | 24,7% |
-| Q3 — 140k–240k | 17,4% |
-| Q4 — Cao nhất (>240.000 NT$) | **14,0%** |
-
+- Nhóm **Q1 - Thấp nhất (<= 50.000 NT$)** có tỷ lệ vỡ nợ cao nhất, đạt **31,8%**.
+- Nhóm **Q2 (50.000 - 140.000 NT$)** có tỷ lệ vỡ nợ **24,7%**.
+- Nhóm **Q3 (140.000 - 240.000 NT$)** có tỷ lệ vỡ nợ **17,4%**.
+- Nhóm **Q4 - Cao nhất (> 240.000 NT$)** có tỷ lệ vỡ nợ thấp nhất, chỉ **14,0%**.
 Khách hàng có hạn mức thấp nhất vỡ nợ với tỷ lệ cao hơn **gấp đôi** so
 với nhóm hạn mức cao nhất. Giải thích: ngân hàng thường cấp hạn mức cao
 hơn cho khách hàng có lịch sử tín dụng tốt và thu nhập ổn định — những
